@@ -2,13 +2,23 @@ import requests
 import json
 import os
 from typing import List, Dict, Optional
+from dotenv import load_dotenv  # 导入读取.env文件的库
 
-# -------------------------- 配置参数 --------------------------
-OPENROUTER_API_KEY = "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"
-API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "x-ai/grok-4.1-fast:free"
-DOCS_FOLDER = "docs"  # 文档文件夹路径
-SUPPORTED_EXTENSIONS = [".txt", ".md", ".json"]  # 支持的文件类型
+# -------------------------- 加载环境变量 --------------------------
+# 加载.env文件中的配置（如果不存在.env文件，会使用系统环境变量）
+load_dotenv()  # 关键：加载.env文件
+
+# 从环境变量中读取配置（支持.env文件和系统环境变量）
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+API_URL = os.getenv("API_URL")
+MODEL_NAME = os.getenv("MODEL_NAME")
+DOCS_FOLDER = os.getenv("DOCS_FOLDER", "docs")  # 默认值：docs（防止未配置）
+
+# 验证必填配置是否存在
+required_env_vars = ["OPENROUTER_API_KEY", "API_URL", "MODEL_NAME"]
+missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+if missing_vars:
+    raise ValueError(f"缺少必要的环境变量：{', '.join(missing_vars)}。请检查.env文件是否配置正确。")
 
 # -------------------------- 工具函数 --------------------------
 def load_documents(folder_path: str) -> Dict[str, str]:
@@ -17,6 +27,7 @@ def load_documents(folder_path: str) -> Dict[str, str]:
     返回: {文件名: 文件内容} 的字典
     """
     documents = {}
+    SUPPORTED_EXTENSIONS = [".txt", ".md", ".json"]  # 支持的文件类型
     
     # 检查文件夹是否存在
     if not os.path.exists(folder_path):
@@ -116,7 +127,7 @@ def build_rag_prompt(query: str, relevant_content: List[Dict[str, str]]) -> str:
 def main():
     # 1. 加载文档
     print("=== 加载文档 ===")
-    documents = load_documents(DOCS_FOLDER)
+    documents = load_documents(DOCS_FOLDER)  # 使用环境变量中的DOCS_FOLDER
     
     # 2. 定义用户查询（可以修改为任意问题）
     user_query = "mysql中的事务.md 中讲了什么?"
@@ -140,13 +151,13 @@ def main():
     # -------------------------- 第一次API调用（带RAG） --------------------------
     print("\n=== 第一次API调用（带RAG） ===")
     response1 = requests.post(
-        url=API_URL,
+        url=API_URL,  # 使用环境变量中的API_URL
         headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",  # 使用环境变量中的API_KEY
             "Content-Type": "application/json",
         },
         data=json.dumps({
-            "model": MODEL_NAME,
+            "model": MODEL_NAME,  # 使用环境变量中的MODEL_NAME
             "messages": [
                 {
                     "role": "user",
@@ -190,13 +201,13 @@ def main():
     # -------------------------- 第二次API调用（继续推理） --------------------------
     print("\n=== 第二次API调用（继续推理） ===")
     response2 = requests.post(
-        url=API_URL,
+        url=API_URL,  # 使用环境变量中的API_URL
         headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",  # 使用环境变量中的API_KEY
             "Content-Type": "application/json",
         },
         data=json.dumps({
-            "model": MODEL_NAME,
+            "model": MODEL_NAME,  # 使用环境变量中的MODEL_NAME
             "messages": messages,
             "extra_body": {"reasoning": {"enabled": True}}
         })
