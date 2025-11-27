@@ -3,3 +3,4 @@ python-dotenv
 dotenv
 fastapi
 pydantic
+uvicorn
