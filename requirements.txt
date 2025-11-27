@@ -3,3 +3,7 @@ python-dotenv
 dotenv
 fastapi
 pydantic
+uvicorn
+httpx
+python-multipart
+aiofiles

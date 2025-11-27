@@ -5,7 +5,9 @@ import re
 import subprocess
 from typing import List, Dict, Optional, Tuple
 from dotenv import load_dotenv
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, UploadFile, File, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 
 # -------------------------- 加载环境变量 --------------------------
@@ -16,14 +18,38 @@ API_URL = os.getenv("API_URL")
 MODEL_NAME = os.getenv("MODEL_NAME")
 DOCS_FOLDER = os.getenv("DOCS_FOLDER", "docs")
 GIT_REPOS_FOLDER = os.getenv("GIT_REPOS_FOLDER", "git_repos")
+CONFIG_FOLDER = os.getenv("CONFIG_FOLDER", "config")
+
+# 确保必要的目录存在
+os.makedirs(DOCS_FOLDER, exist_ok=True)
+os.makedirs(CONFIG_FOLDER, exist_ok=True)
+os.makedirs("static", exist_ok=True)
 
 # -------------------------- FastAPI 初始化 --------------------------
 app = FastAPI(root_path="/rag")
+
+# 挂载静态文件
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # -------------------------- 请求模型 --------------------------
 class QueryRequest(BaseModel):
     api_key: str
     user_query: str
+
+class PromptConfig(BaseModel):
+    system_prompt: str
+    follow_up_prompt: str
+
+class ContextConfig(BaseModel):
+    project_name: Optional[str] = ""
+    project_description: Optional[str] = ""
+    tech_stack: Optional[str] = ""
+    additional_context: Optional[str] = ""
+
+class ExampleCode(BaseModel):
+    language: str
+    code: str
+    description: Optional[str] = ""
 
 # -------------------------- Git相关工具函数 --------------------------
 def is_git_available() -> bool:
@@ -178,10 +204,74 @@ def retrieve_relevant_content(query: str, documents: Dict[str, str], top_k: int 
     relevant_chunks.sort(key=lambda x: x["match_count"], reverse=True)
     return relevant_chunks[:top_k]
 
+# -------------------------- 配置文件辅助函数 --------------------------
+def load_config(filename: str) -> dict:
+    """加载配置文件"""
+    config_path = os.path.join(CONFIG_FOLDER, filename)
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_config(filename: str, data: dict):
+    """保存配置文件"""
+    config_path = os.path.join(CONFIG_FOLDER, filename)
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_prompt_config() -> dict:
+    """获取 Prompt 配置"""
+    config = load_config("prompt_config.json")
+    return {
+        "system_prompt": config.get("system_prompt", "基于以下参考信息来回答用户的问题。如果参考信息中有相关数据，请优先使用参考信息回答；如果没有相关信息，可以使用你自己的知识回答。"),
+        "follow_up_prompt": config.get("follow_up_prompt", "Are you sure? Think carefully.")
+    }
+
+def get_context_config() -> dict:
+    """获取项目上下文配置"""
+    return load_config("context_config.json")
+
+def get_example_codes() -> list:
+    """获取示例代码列表"""
+    config = load_config("examples_config.json")
+    return config.get("examples", [])
+
 def build_rag_prompt(query: str, relevant_content: List[Dict[str, str]], git_repo_info: Optional[Dict] = None) -> str:
-    base_prompt = "基于以下参考信息来回答用户的问题。如果参考信息中有相关数据，请优先使用参考信息回答；如果没有相关信息，可以使用你自己的知识回答。"
+    # 加载配置
+    prompt_config = get_prompt_config()
+    context_config = get_context_config()
+    example_codes = get_example_codes()
+    
+    base_prompt = prompt_config["system_prompt"]
     
     context_parts = []
+    
+    # 添加项目上下文
+    if context_config:
+        project_info = []
+        if context_config.get("project_name"):
+            project_info.append(f"项目名称: {context_config['project_name']}")
+        if context_config.get("project_description"):
+            project_info.append(f"项目描述: {context_config['project_description']}")
+        if context_config.get("tech_stack"):
+            project_info.append(f"技术栈: {context_config['tech_stack']}")
+        if context_config.get("additional_context"):
+            project_info.append(f"额外信息: {context_config['additional_context']}")
+        
+        if project_info:
+            context_parts.append("项目背景信息：\n" + "\n".join(project_info))
+            context_parts.append("---")
+    
+    # 添加示例代码
+    if example_codes:
+        examples_text = "参考示例代码（请遵循类似的代码风格）：\n"
+        for idx, ex in enumerate(example_codes):
+            examples_text += f"\n示例 {idx + 1} ({ex.get('language', 'unknown')}):\n"
+            if ex.get("description"):
+                examples_text += f"说明: {ex['description']}\n"
+            examples_text += f"```{ex.get('language', '')}\n{ex.get('code', '')}\n```\n"
+        context_parts.append(examples_text)
+        context_parts.append("---")
     if git_repo_info:
         repo_name = git_repo_info.get("repo_name", "")
         file_count = git_repo_info.get("file_count", 0)
@@ -221,11 +311,123 @@ def build_rag_prompt(query: str, relevant_content: List[Dict[str, str]], git_rep
     return rag_prompt.strip()
 
 # -------------------------- API接口 --------------------------
+
+# 首页
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    return FileResponse("static/index.html")
+
+# 文件上传接口
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """上传文件到 docs 文件夹"""
+    try:
+        file_path = os.path.join(DOCS_FOLDER, file.filename)
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        return {"message": "文件上传成功", "filename": file.filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 获取文件列表
+@app.get("/files")
+async def list_files():
+    """获取 docs 文件夹中的文件列表"""
+    files = []
+    if os.path.exists(DOCS_FOLDER):
+        for filename in os.listdir(DOCS_FOLDER):
+            file_path = os.path.join(DOCS_FOLDER, filename)
+            if os.path.isfile(file_path):
+                files.append({
+                    "name": filename,
+                    "size": os.path.getsize(file_path),
+                    "modified": os.path.getmtime(file_path)
+                })
+    return {"files": files}
+
+# 删除文件
+@app.delete("/files/{filename}")
+async def delete_file(filename: str):
+    """删除指定文件"""
+    file_path = os.path.join(DOCS_FOLDER, filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        return {"message": "文件已删除"}
+    raise HTTPException(status_code=404, detail="文件不存在")
+
+# 获取文件内容
+@app.get("/files/{filename}/content")
+async def get_file_content(filename: str):
+    """获取文件内容"""
+    file_path = os.path.join(DOCS_FOLDER, filename)
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return {"content": content}
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="无法读取二进制文件")
+    raise HTTPException(status_code=404, detail="文件不存在")
+
+# Prompt 配置接口
+@app.get("/config/prompt")
+async def get_prompt():
+    """获取 Prompt 配置"""
+    return get_prompt_config()
+
+@app.post("/config/prompt")
+async def save_prompt(config: PromptConfig):
+    """保存 Prompt 配置"""
+    save_config("prompt_config.json", config.dict())
+    return {"message": "配置已保存"}
+
+# 项目上下文配置接口
+@app.get("/config/context")
+async def get_context():
+    """获取项目上下文配置"""
+    return get_context_config()
+
+@app.post("/config/context")
+async def save_context(config: ContextConfig):
+    """保存项目上下文配置"""
+    save_config("context_config.json", config.dict())
+    return {"message": "配置已保存"}
+
+# 示例代码配置接口
+@app.get("/config/examples")
+async def get_examples():
+    """获取示例代码列表"""
+    return {"examples": get_example_codes()}
+
+@app.post("/config/examples")
+async def save_example(example: ExampleCode):
+    """保存示例代码"""
+    config = load_config("examples_config.json")
+    examples = config.get("examples", [])
+    examples.append(example.dict())
+    save_config("examples_config.json", {"examples": examples})
+    return {"message": "示例已保存"}
+
+@app.delete("/config/examples/{index}")
+async def delete_example(index: int):
+    """删除指定示例代码"""
+    config = load_config("examples_config.json")
+    examples = config.get("examples", [])
+    if 0 <= index < len(examples):
+        examples.pop(index)
+        save_config("examples_config.json", {"examples": examples})
+        return {"message": "示例已删除"}
+    raise HTTPException(status_code=404, detail="示例不存在")
+
 @app.post("/query")
 async def query(request: QueryRequest):
     api_key = request.api_key
     user_query = request.user_query
-    follow_up_query = "Are you sure? Think carefully."
+    
+    # 从配置中获取 follow_up_query
+    prompt_config = get_prompt_config()
+    follow_up_query = prompt_config["follow_up_prompt"]
     
     git_repo_info = None
     local_repo_path = None

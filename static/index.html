@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --bg-dark: #1e1e2e;
+            --bg-card: #2d2d3f;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border-color: #3d3d5c;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #2d2d44 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        .navbar {
+            background: rgba(30, 30, 46, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.5rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+        }
+        
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            padding: 1rem 1.5rem;
+        }
+        
+        .nav-tabs {
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .nav-tabs .nav-link {
+            color: var(--text-secondary);
+            border: none;
+            padding: 1rem 1.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            color: var(--text-primary);
+            border: none;
+        }
+        
+        .nav-tabs .nav-link.active {
+            background: transparent;
+            color: var(--primary-color);
+            border: none;
+            border-bottom: 3px solid var(--primary-color);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            padding: 0.6rem 1.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+        }
+        
+        .btn-outline-secondary {
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+        }
+        
+        .btn-outline-secondary:hover {
+            background: var(--border-color);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .form-control, .form-select {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: var(--primary-color);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        
+        .form-control::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        textarea.form-control {
+            min-height: 200px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        
+        .code-editor {
+            min-height: 300px;
+            background: #1a1a2e;
+            border-radius: 8px;
+        }
+        
+        .file-upload-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .file-upload-zone:hover, .file-upload-zone.dragover {
+            border-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .file-upload-zone i {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .file-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        
+        .file-item:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        .file-item .file-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .file-item i {
+            color: var(--primary-color);
+        }
+        
+        .file-item .file-size {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        
+        .alert {
+            border: none;
+            border-radius: 8px;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1050;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-saved {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .status-modified {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+        
+        .sidebar-stats {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+        
+        .loading-spinner {
+            display: none;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .btn-loading .loading-spinner {
+            display: inline-block;
+        }
+        
+        .btn-loading .btn-text {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-braces-asterisk me-2"></i>RAG 管理系统
+            </a>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-success me-3">
+                    <i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i>
+                    系统运行中
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Main Content -->
+    <div class="container py-4">
+        <div class="row g-4">
+            <!-- Main Panel -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="files-tab" data-bs-toggle="tab" data-bs-target="#files" type="button">
+                                <i class="bi bi-folder me-2"></i>文档管理
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="prompt-tab" data-bs-toggle="tab" data-bs-target="#prompt" type="button">
+                                <i class="bi bi-chat-square-text me-2"></i>Prompt 管理
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="context-tab" data-bs-toggle="tab" data-bs-target="#context" type="button">
+                                <i class="bi bi-info-circle me-2"></i>项目上下文
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="examples-tab" data-bs-toggle="tab" data-bs-target="#examples" type="button">
+                                <i class="bi bi-code-square me-2"></i>示例代码
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content p-4" id="mainTabsContent">
+                        <!-- 文档管理 Tab -->
+                        <div class="tab-pane fade show active" id="files" role="tabpanel">
+                            <div class="file-upload-zone" id="dropZone">
+                                <i class="bi bi-cloud-arrow-up"></i>
+                                <h5>拖拽文件到此处上传</h5>
+                                <p class="text-secondary mb-3">或点击选择文件</p>
+                                <input type="file" id="fileInput" multiple hidden>
+                                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                    <i class="bi bi-plus-lg me-2"></i>选择文件
+                                </button>
+                            </div>
+                            
+                            <hr class="my-4" style="border-color: var(--border-color);">
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-folder2-open me-2"></i>已上传文件
+                                </h6>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="loadFiles()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>刷新
+                                </button>
+                            </div>
+                            
+                            <div class="file-list" id="fileList">
+                                <p class="text-secondary text-center py-4">加载中...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Prompt 管理 Tab -->
+                        <div class="tab-pane fade" id="prompt" role="tabpanel">
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <label class="form-label mb-0">
+                                        <i class="bi bi-chat-left-text me-2"></i>系统 Prompt
+                                    </label>
+                                    <span class="status-badge status-saved" id="promptStatus">已保存</span>
+                                </div>
+                                <textarea class="form-control code-editor" id="systemPrompt" placeholder="输入系统 Prompt...">基于以下参考信息来回答用户的问题。如果参考信息中有相关数据，请优先使用参考信息回答；如果没有相关信息，可以使用你自己的知识回答。</textarea>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <i class="bi bi-question-circle me-2"></i>Follow-up 问题
+                                </label>
+                                <input type="text" class="form-control" id="followUpPrompt" 
+                                       value="Are you sure? Think carefully." 
+                                       placeholder="输入追问内容...">
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" onclick="savePromptConfig()">
+                                    <span class="btn-text"><i class="bi bi-check-lg me-2"></i>保存配置</span>
+                                    <span class="loading-spinner"></span>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="resetPromptConfig()">
+                                    <i class="bi bi-arrow-counterclockwise me-2"></i>重置默认
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 项目上下文 Tab -->
+                        <div class="tab-pane fade" id="context" role="tabpanel">
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <i class="bi bi-briefcase me-2"></i>项目名称
+                                </label>
+                                <input type="text" class="form-control" id="projectName" placeholder="输入项目名称...">
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <i class="bi bi-file-text me-2"></i>项目描述
+                                </label>
+                                <textarea class="form-control" id="projectDescription" rows="4" placeholder="描述你的项目..."></textarea>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <i class="bi bi-stack me-2"></i>技术栈
+                                </label>
+                                <input type="text" class="form-control" id="techStack" placeholder="例如: Python, FastAPI, React, PostgreSQL...">
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <i class="bi bi-card-text me-2"></i>额外上下文信息
+                                </label>
+                                <textarea class="form-control code-editor" id="additionalContext" placeholder="添加任何需要 AI 了解的额外信息..."></textarea>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" onclick="saveContextConfig()">
+                                    <span class="btn-text"><i class="bi bi-check-lg me-2"></i>保存上下文</span>
+                                    <span class="loading-spinner"></span>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="clearContextConfig()">
+                                    <i class="bi bi-trash me-2"></i>清空
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 示例代码 Tab -->
+                        <div class="tab-pane fade" id="examples" role="tabpanel">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <label class="form-label mb-0">
+                                        <i class="bi bi-code-slash me-2"></i>示例代码片段
+                                    </label>
+                                    <div class="d-flex gap-2">
+                                        <select class="form-select form-select-sm" id="codeLanguage" style="width: auto;">
+                                            <option value="python">Python</option>
+                                            <option value="javascript">JavaScript</option>
+                                            <option value="typescript">TypeScript</option>
+                                            <option value="java">Java</option>
+                                            <option value="go">Go</option>
+                                            <option value="rust">Rust</option>
+                                            <option value="other">其他</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <textarea class="form-control code-editor" id="exampleCode" style="min-height: 350px;" placeholder="# 在这里添加示例代码...
+# AI 将参考这些代码来生成类似风格的回答
+
+def example_function():
+    pass"></textarea>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <i class="bi bi-chat-dots me-2"></i>代码说明
+                                </label>
+                                <textarea class="form-control" id="codeDescription" rows="3" placeholder="解释这段代码的用途和风格要求..."></textarea>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" onclick="saveExampleCode()">
+                                    <span class="btn-text"><i class="bi bi-check-lg me-2"></i>保存示例</span>
+                                    <span class="loading-spinner"></span>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="addNewExample()">
+                                    <i class="bi bi-plus-lg me-2"></i>新建示例
+                                </button>
+                            </div>
+                            
+                            <hr class="my-4" style="border-color: var(--border-color);">
+                            
+                            <h6 class="mb-3">
+                                <i class="bi bi-collection me-2"></i>已保存的示例
+                            </h6>
+                            <div id="savedExamples">
+                                <p class="text-secondary">暂无保存的示例代码</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- 快速查询 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-search me-2"></i>快速查询
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="apiKey" placeholder="输入 API Key...">
+                        </div>
+                        <div class="mb-3">
+                            <textarea class="form-control" id="queryInput" rows="4" placeholder="输入你的问题..."></textarea>
+                        </div>
+                        <button class="btn btn-primary w-100" onclick="submitQuery()" id="queryBtn">
+                            <span class="btn-text"><i class="bi bi-send me-2"></i>发送查询</span>
+                            <span class="loading-spinner"></span>
+                        </button>
+                        
+                        <div class="mt-3" id="queryResult" style="display: none;">
+                            <label class="form-label text-secondary">查询结果:</label>
+                            <div class="p-3" style="background: rgba(0,0,0,0.2); border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                                <pre id="queryResultContent" style="white-space: pre-wrap; margin: 0; color: var(--text-primary);"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 系统状态 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-activity me-2"></i>系统状态
+                    </div>
+                    <div class="card-body">
+                        <div class="sidebar-stats">
+                            <div class="stat-item">
+                                <span>文档数量</span>
+                                <span class="stat-value" id="docCount">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>示例代码</span>
+                                <span class="stat-value" id="exampleCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>API 状态</span>
+                                <span class="stat-value text-success">
+                                    <i class="bi bi-check-circle"></i> 正常
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 帮助 -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-lightbulb me-2"></i>使用帮助
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0" style="font-size: 0.9rem; color: var(--text-secondary);">
+                            <li class="mb-2">
+                                <i class="bi bi-check2 text-success me-2"></i>
+                                上传文档到 docs 文件夹增强 AI 回答
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check2 text-success me-2"></i>
+                                自定义 Prompt 调整 AI 行为
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check2 text-success me-2"></i>
+                                添加项目上下文提供背景信息
+                            </li>
+                            <li>
+                                <i class="bi bi-check2 text-success me-2"></i>
+                                示例代码帮助 AI 理解代码风格
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/rag';
+        
+        // Toast 通知
+        function showToast(message, type = 'success') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
+            const iconClass = type === 'success' ? 'bi-check-circle-fill text-success' : 
+                             type === 'error' ? 'bi-x-circle-fill text-danger' : 
+                             'bi-info-circle-fill text-info';
+            
+            const toastHtml = `
+                <div id="${toastId}" class="toast show" role="alert" style="background: var(--bg-card); border: 1px solid var(--border-color);">
+                    <div class="toast-body d-flex align-items-center" style="color: var(--text-primary);">
+                        <i class="bi ${iconClass} me-2"></i>
+                        ${message}
+                    </div>
+                </div>
+            `;
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            
+            setTimeout(() => {
+                const toast = document.getElementById(toastId);
+                if (toast) toast.remove();
+            }, 3000);
+        }
+        
+        // 文件上传
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            uploadFiles(files);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            uploadFiles(e.target.files);
+        });
+        
+        async function uploadFiles(files) {
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch(`${API_BASE}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        showToast(`文件 "${file.name}" 上传成功`);
+                    } else {
+                        const error = await response.json();
+                        showToast(`上传失败: ${error.detail}`, 'error');
+                    }
+                } catch (error) {
+                    showToast(`上传失败: ${error.message}`, 'error');
+                }
+            }
+            loadFiles();
+        }
+        
+        async function loadFiles() {
+            try {
+                const response = await fetch(`${API_BASE}/files`);
+                const data = await response.json();
+                
+                const fileList = document.getElementById('fileList');
+                document.getElementById('docCount').textContent = data.files.length;
+                
+                if (data.files.length === 0) {
+                    fileList.innerHTML = '<p class="text-secondary text-center py-4">暂无上传文件</p>';
+                    return;
+                }
+                
+                fileList.innerHTML = data.files.map(file => `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <i class="bi bi-file-earmark-text"></i>
+                            <div>
+                                <div>${file.name}</div>
+                                <div class="file-size">${formatFileSize(file.size)}</div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="viewFile('${file.name}')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteFile('${file.name}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('fileList').innerHTML = 
+                    '<p class="text-danger text-center py-4">加载文件列表失败</p>';
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        async function deleteFile(filename) {
+            if (!confirm(`确定要删除 "${filename}" 吗？`)) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/files/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showToast(`文件 "${filename}" 已删除`);
+                    loadFiles();
+                } else {
+                    showToast('删除失败', 'error');
+                }
+            } catch (error) {
+                showToast(`删除失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function viewFile(filename) {
+            try {
+                const response = await fetch(`${API_BASE}/files/${encodeURIComponent(filename)}/content`);
+                const data = await response.json();
+                alert(`文件内容:\n\n${data.content.substring(0, 1000)}${data.content.length > 1000 ? '...' : ''}`);
+            } catch (error) {
+                showToast('无法查看文件', 'error');
+            }
+        }
+        
+        // Prompt 配置
+        async function savePromptConfig() {
+            const btn = event.target.closest('button');
+            btn.classList.add('btn-loading');
+            
+            try {
+                const response = await fetch(`${API_BASE}/config/prompt`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_prompt: document.getElementById('systemPrompt').value,
+                        follow_up_prompt: document.getElementById('followUpPrompt').value
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast('Prompt 配置已保存');
+                    document.getElementById('promptStatus').textContent = '已保存';
+                    document.getElementById('promptStatus').className = 'status-badge status-saved';
+                } else {
+                    showToast('保存失败', 'error');
+                }
+            } catch (error) {
+                showToast(`保存失败: ${error.message}`, 'error');
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        }
+        
+        function resetPromptConfig() {
+            document.getElementById('systemPrompt').value = 
+                '基于以下参考信息来回答用户的问题。如果参考信息中有相关数据，请优先使用参考信息回答；如果没有相关信息，可以使用你自己的知识回答。';
+            document.getElementById('followUpPrompt').value = 'Are you sure? Think carefully.';
+            document.getElementById('promptStatus').textContent = '已修改';
+            document.getElementById('promptStatus').className = 'status-badge status-modified';
+        }
+        
+        // 上下文配置
+        async function saveContextConfig() {
+            const btn = event.target.closest('button');
+            btn.classList.add('btn-loading');
+            
+            try {
+                const response = await fetch(`${API_BASE}/config/context`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_name: document.getElementById('projectName').value,
+                        project_description: document.getElementById('projectDescription').value,
+                        tech_stack: document.getElementById('techStack').value,
+                        additional_context: document.getElementById('additionalContext').value
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast('项目上下文已保存');
+                } else {
+                    showToast('保存失败', 'error');
+                }
+            } catch (error) {
+                showToast(`保存失败: ${error.message}`, 'error');
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        }
+        
+        function clearContextConfig() {
+            document.getElementById('projectName').value = '';
+            document.getElementById('projectDescription').value = '';
+            document.getElementById('techStack').value = '';
+            document.getElementById('additionalContext').value = '';
+            showToast('已清空', 'info');
+        }
+        
+        // 示例代码
+        async function saveExampleCode() {
+            const btn = event.target.closest('button');
+            btn.classList.add('btn-loading');
+            
+            try {
+                const response = await fetch(`${API_BASE}/config/examples`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        language: document.getElementById('codeLanguage').value,
+                        code: document.getElementById('exampleCode').value,
+                        description: document.getElementById('codeDescription').value
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast('示例代码已保存');
+                    loadSavedExamples();
+                } else {
+                    showToast('保存失败', 'error');
+                }
+            } catch (error) {
+                showToast(`保存失败: ${error.message}`, 'error');
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        }
+        
+        function addNewExample() {
+            document.getElementById('exampleCode').value = '';
+            document.getElementById('codeDescription').value = '';
+            showToast('请输入新的示例代码', 'info');
+        }
+        
+        async function loadSavedExamples() {
+            try {
+                const response = await fetch(`${API_BASE}/config/examples`);
+                const data = await response.json();
+                
+                document.getElementById('exampleCount').textContent = data.examples?.length || 0;
+                
+                const container = document.getElementById('savedExamples');
+                if (!data.examples || data.examples.length === 0) {
+                    container.innerHTML = '<p class="text-secondary">暂无保存的示例代码</p>';
+                    return;
+                }
+                
+                container.innerHTML = data.examples.map((ex, idx) => `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <i class="bi bi-code-slash"></i>
+                            <div>
+                                <div>${ex.language} 示例 ${idx + 1}</div>
+                                <div class="file-size">${ex.description?.substring(0, 50) || '无描述'}...</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteExample(${idx})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载示例失败:', error);
+            }
+        }
+        
+        async function deleteExample(index) {
+            try {
+                const response = await fetch(`${API_BASE}/config/examples/${index}`, {
+                    method: 'DELETE'
+                });
+                if (response.ok) {
+                    showToast('示例已删除');
+                    loadSavedExamples();
+                }
+            } catch (error) {
+                showToast('删除失败', 'error');
+            }
+        }
+        
+        // 查询
+        async function submitQuery() {
+            const apiKey = document.getElementById('apiKey').value;
+            const query = document.getElementById('queryInput').value;
+            
+            if (!apiKey || !query) {
+                showToast('请填写 API Key 和查询内容', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('queryBtn');
+            btn.classList.add('btn-loading');
+            
+            try {
+                const response = await fetch(`${API_BASE}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: apiKey,
+                        user_query: query
+                    })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('queryResult').style.display = 'block';
+                document.getElementById('queryResultContent').textContent = 
+                    data.second_response || data.first_response || JSON.stringify(data, null, 2);
+                    
+                showToast('查询成功');
+            } catch (error) {
+                showToast(`查询失败: ${error.message}`, 'error');
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        }
+        
+        // 加载配置
+        async function loadConfigs() {
+            try {
+                // 加载 Prompt 配置
+                const promptRes = await fetch(`${API_BASE}/config/prompt`);
+                if (promptRes.ok) {
+                    const promptData = await promptRes.json();
+                    if (promptData.system_prompt) {
+                        document.getElementById('systemPrompt').value = promptData.system_prompt;
+                    }
+                    if (promptData.follow_up_prompt) {
+                        document.getElementById('followUpPrompt').value = promptData.follow_up_prompt;
+                    }
+                }
+                
+                // 加载上下文配置
+                const contextRes = await fetch(`${API_BASE}/config/context`);
+                if (contextRes.ok) {
+                    const contextData = await contextRes.json();
+                    document.getElementById('projectName').value = contextData.project_name || '';
+                    document.getElementById('projectDescription').value = contextData.project_description || '';
+                    document.getElementById('techStack').value = contextData.tech_stack || '';
+                    document.getElementById('additionalContext').value = contextData.additional_context || '';
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+        
+        // 监听输入变化
+        document.getElementById('systemPrompt').addEventListener('input', () => {
+            document.getElementById('promptStatus').textContent = '已修改';
+            document.getElementById('promptStatus').className = 'status-badge status-modified';
+        });
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFiles();
+            loadConfigs();
+            loadSavedExamples();
+        });
+    </script>
+</body>
+</html>

@@ -18,11 +18,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制项目代码
 COPY . .
 
-# 创建必要目录（Git仓库存储、文档目录）
-RUN mkdir -p /app/git_repos /app/docs
+# 创建必要目录（Git仓库存储、文档目录、配置目录、静态文件）
+RUN mkdir -p /app/git_repos /app/docs /app/config /app/static
 
 # 暴露端口（FastAPI默认8000）
 EXPOSE 8000
 
 # 启动命令（使用uvicorn运行FastAPI）
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python","app.py"]
